@@ -43,6 +43,8 @@ class AppServiceProvider extends ServiceProvider
             [
                 'read_products',
                 'write_products',
+                'read_inventory',
+                'write_inventory',
             ],
             $host,
             new DbSessionStorage(),

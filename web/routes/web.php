@@ -96,6 +96,33 @@ Route::get('/api/products/count', function (Request $request) {
     return response($result->getDecodedBody());
 })->middleware('shopify.auth');
 
+// Low Stock Pulse API Routes
+Route::middleware('shopify.auth')->prefix('api/low-stock-pulse')->group(function () {
+    // Test endpoint
+    Route::get('/test', function () {
+        return response()->json([
+            'success' => true,
+            'message' => 'API is working',
+            'timestamp' => now(),
+        ]);
+    });
+
+    // Product management routes
+    Route::get('/products', [App\Http\Controllers\ProductController::class, 'index']);
+    Route::post('/products/threshold', [App\Http\Controllers\ProductController::class, 'setThreshold']);
+    Route::post('/products/toggle-alerts', [App\Http\Controllers\ProductController::class, 'toggleAlerts']);
+    Route::post('/products/update-inventory', [App\Http\Controllers\ProductController::class, 'updateInventory']);
+    Route::get('/products/below-threshold', [App\Http\Controllers\ProductController::class, 'getBelowThreshold']);
+
+    // Settings management routes
+    Route::get('/settings', [App\Http\Controllers\SettingsController::class, 'index']);
+    Route::put('/settings', [App\Http\Controllers\SettingsController::class, 'update']);
+    Route::get('/settings/activity-logs', [App\Http\Controllers\SettingsController::class, 'getActivityLogs']);
+    Route::get('/settings/recent-logs', [App\Http\Controllers\SettingsController::class, 'getRecentActivityLogs']);
+    Route::post('/settings/test-email', [App\Http\Controllers\SettingsController::class, 'testEmail']);
+    Route::get('/dashboard/stats', [App\Http\Controllers\SettingsController::class, 'getDashboardStats']);
+});
+
 Route::post('/api/products', function (Request $request) {
     /** @var AuthSession */
     $session = $request->get('shopifySession'); // Provided by the shopify.auth middleware, guaranteed to be active
