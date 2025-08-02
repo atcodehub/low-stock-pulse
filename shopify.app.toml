@@ -1,0 +1,19 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "6ef7552990bbf7b51027e7572d3418af"
+name = "Low Stock Pulse"
+handle = "low-stock-pulse"
+application_url = "https://example.com/"
+embedded = true
+
+[build]
+include_config_on_deploy = true
+
+[webhooks]
+api_version = "2025-07"
+
+[auth]
+redirect_urls = [ "https://example.com/api/auth" ]
+
+[pos]
+embedded = false
