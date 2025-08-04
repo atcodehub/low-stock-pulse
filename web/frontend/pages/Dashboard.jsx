@@ -35,57 +35,32 @@ export default function Dashboard() {
   const fetchDashboardData = useCallback(async () => {
     setLoading(true);
     try {
-      console.log('Testing API connectivity...');
-      // Test basic API connectivity first
-      const testResponse = await fetch('/api/low-stock-pulse/test');
-      console.log('Test response status:', testResponse.status);
-
-      if (!testResponse.ok) {
-        throw new Error(`API test failed with status: ${testResponse.status}`);
-      }
-
-      const testData = await testResponse.json();
-      console.log('Test data:', testData);
-
-      if (!testData.success) {
-        throw new Error('API test returned failure');
-      }
-
-      console.log('Fetching dashboard stats...');
       // Fetch dashboard stats
       const statsResponse = await fetch('/api/low-stock-pulse/dashboard/stats');
-      console.log('Stats response status:', statsResponse.status);
 
       if (!statsResponse.ok) {
         throw new Error(`Stats API failed with status: ${statsResponse.status}`);
       }
 
       const statsData = await statsResponse.json();
-      console.log('Stats data:', statsData);
 
       if (statsData.success) {
         setStats(statsData.data);
       } else {
-        console.error('Stats API returned error:', statsData.message);
         setToast({ content: statsData.message || 'Failed to fetch stats', error: true });
       }
 
-      console.log('Fetching recent logs...');
       // Fetch recent activity logs
       const logsResponse = await fetch('/api/low-stock-pulse/settings/recent-logs');
-      console.log('Logs response status:', logsResponse.status);
 
       if (!logsResponse.ok) {
         throw new Error(`Logs API failed with status: ${logsResponse.status}`);
       }
 
       const logsData = await logsResponse.json();
-      console.log('Logs data:', logsData);
 
       if (logsData.success) {
         setRecentLogs(logsData.data);
-      } else {
-        console.error('Logs API returned error:', logsData.message);
       }
 
     } catch (error) {
@@ -94,11 +69,11 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  }, [fetch]);
+  }, []); // Remove fetch dependency to prevent infinite loop
 
   useEffect(() => {
     fetchDashboardData();
-  }, [fetchDashboardData]);
+  }, []); // Empty dependency array - only run once on mount
 
   const formatDate = (dateString) => {
     if (!dateString) return 'Never';

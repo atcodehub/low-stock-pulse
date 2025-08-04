@@ -33,6 +33,7 @@ export default function Settings() {
   const [testingEmail, setTestingEmail] = useState(false);
   const [toast, setToast] = useState(null);
   const [testEmail, setTestEmail] = useState('');
+  const [emailServiceInfo, setEmailServiceInfo] = useState(null);
 
   const frequencyOptions = [
     { label: 'Instant', value: 'instant' },
@@ -55,23 +56,31 @@ export default function Settings() {
     try {
       const response = await fetch('/api/low-stock-pulse/settings');
       const data = await response.json();
-      
+
       if (data.success) {
         setSettings(data.data);
         setTestEmail(data.data.alert_email || '');
       } else {
         setToast({ content: data.message || 'Failed to fetch settings', error: true });
       }
+
+      // Fetch email service info
+      const emailInfoResponse = await fetch('/api/low-stock-pulse/settings/email-service-info');
+      const emailInfoData = await emailInfoResponse.json();
+
+      if (emailInfoData.success) {
+        setEmailServiceInfo(emailInfoData.data);
+      }
     } catch (error) {
       setToast({ content: 'Error fetching settings', error: true });
     } finally {
       setLoading(false);
     }
-  }, [fetch]);
+  }, []); // Remove fetch dependency to prevent infinite loop
 
   useEffect(() => {
     fetchSettings();
-  }, [fetchSettings]);
+  }, []); // Empty dependency array - only run once on mount
 
   const handleSave = async () => {
     setSaving(true);
@@ -114,7 +123,7 @@ export default function Settings() {
       const data = await response.json();
       
       if (data.success) {
-        setToast({ content: 'Test email sent successfully' });
+        setToast({ content: 'Test email sent successfully via Amazon SES!' });
       } else {
         setToast({ content: data.message || 'Failed to send test email', error: true });
       }
@@ -218,10 +227,44 @@ export default function Settings() {
           </Layout.Section>
 
           <Layout.Section>
+            <LegacyCard sectioned title="Shopify Email Integration">
+              <LegacyStack vertical spacing="loose">
+                <Text variant="bodyMd">
+                  Your Low Stock Pulse app uses Amazon SES (Simple Email Service) integrated with Shopify branding to send alerts to your specified email addresses.
+                </Text>
+
+                {emailServiceInfo && (
+                  <div style={{ background: '#f6f6f7', padding: '16px', borderRadius: '8px' }}>
+                    <LegacyStack vertical spacing="tight">
+                      <Text variant="headingMd">📧 Email Service Status</Text>
+                      <Text variant="bodyMd">
+                        <strong>Shop:</strong> {emailServiceInfo.shop_info?.name} ({emailServiceInfo.shop_info?.domain})
+                      </Text>
+                      <Text variant="bodyMd">
+                        <strong>Email Capability:</strong> {emailServiceInfo.can_send_emails ? '✅ Enabled' : '❌ Limited'}
+                      </Text>
+                      <Text variant="bodyMd">
+                        <strong>Email Service:</strong> Amazon SES (Simple Email Service)
+                      </Text>
+                      <Text variant="bodyMd">
+                        <strong>Status:</strong> {emailServiceInfo.recommended_service}
+                      </Text>
+                    </LegacyStack>
+                  </div>
+                )}
+
+                <Text variant="bodyMd" color="subdued">
+                  Emails are sent using Amazon SES with Shopify branding for enterprise-grade deliverability and compliance.
+                </Text>
+              </LegacyStack>
+            </LegacyCard>
+          </Layout.Section>
+
+          <Layout.Section>
             <LegacyCard sectioned title="Test Email">
               <LegacyStack vertical spacing="loose">
                 <Text variant="bodyMd">
-                  Send a test email to verify your email configuration is working correctly.
+                  Send a test email to any email address to verify your Amazon SES integration is working correctly.
                 </Text>
                 
                 <FormLayout>

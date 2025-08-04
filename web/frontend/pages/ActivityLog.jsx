@@ -51,11 +51,11 @@ export default function ActivityLog() {
     } finally {
       setLoading(false);
     }
-  }, [fetch]);
+  }, []); // Remove fetch dependency to prevent infinite loop
 
   useEffect(() => {
     fetchActivityLogs();
-  }, [fetchActivityLogs]);
+  }, []); // Empty dependency array - only run once on mount
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);

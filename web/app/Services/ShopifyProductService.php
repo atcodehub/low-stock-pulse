@@ -122,34 +122,69 @@ class ShopifyProductService
      */
     public function getInventoryLevel(string $productId, ?string $variantId = null): ?int
     {
-        $query = $this->buildInventoryQuery();
-        
-        $id = $variantId 
-            ? "gid://shopify/ProductVariant/{$variantId}"
-            : "gid://shopify/Product/{$productId}";
-
         try {
-            $response = $this->graphqlClient->query([
-                'query' => $query,
-                'variables' => ['id' => $id],
-            ]);
-
-            $body = $response->getDecodedBody();
-            
-            if (isset($body['errors'])) {
-                return null;
-            }
-
             if ($variantId) {
+                // Query specific variant
+                $query = '
+                    query getVariantInventory($id: ID!) {
+                        productVariant(id: $id) {
+                            id
+                            inventoryQuantity
+                        }
+                    }
+                ';
+                $id = "gid://shopify/ProductVariant/{$variantId}";
+
+                $response = $this->graphqlClient->query([
+                    'query' => $query,
+                    'variables' => ['id' => $id],
+                ]);
+
+                $body = $response->getDecodedBody();
+
+                if (isset($body['errors'])) {
+                    Log::error('GraphQL errors in getInventoryLevel: ' . json_encode($body['errors']));
+                    return null;
+                }
+
                 return $body['data']['productVariant']['inventoryQuantity'] ?? null;
+
             } else {
-                // For products without specific variant, get the first variant's inventory
+                // Query product's first variant
+                $query = '
+                    query getProductInventory($id: ID!) {
+                        product(id: $id) {
+                            variants(first: 1) {
+                                edges {
+                                    node {
+                                        id
+                                        inventoryQuantity
+                                    }
+                                }
+                            }
+                        }
+                    }
+                ';
+                $id = "gid://shopify/Product/{$productId}";
+
+                $response = $this->graphqlClient->query([
+                    'query' => $query,
+                    'variables' => ['id' => $id],
+                ]);
+
+                $body = $response->getDecodedBody();
+
+                if (isset($body['errors'])) {
+                    Log::error('GraphQL errors in getInventoryLevel: ' . json_encode($body['errors']));
+                    return null;
+                }
+
                 $variants = $body['data']['product']['variants']['edges'] ?? [];
                 return !empty($variants) ? $variants[0]['node']['inventoryQuantity'] : null;
             }
-            
+
         } catch (\Exception $e) {
-            Log::error('Failed to fetch inventory level: ' . $e->getMessage());
+            Log::error("Failed to fetch inventory level for product {$productId}, variant {$variantId}: " . $e->getMessage());
             return null;
         }
     }
@@ -219,30 +254,7 @@ class ShopifyProductService
         ';
     }
 
-    /**
-     * Build the GraphQL query for fetching inventory levels.
-     */
-    private function buildInventoryQuery(): string
-    {
-        return '
-            query getInventory($id: ID!) {
-                productVariant(id: $id) {
-                    id
-                    inventoryQuantity
-                }
-                product(id: $id) {
-                    variants(first: 1) {
-                        edges {
-                            node {
-                                id
-                                inventoryQuantity
-                            }
-                        }
-                    }
-                }
-            }
-        ';
-    }
+
 
     /**
      * Process the products response from GraphQL.

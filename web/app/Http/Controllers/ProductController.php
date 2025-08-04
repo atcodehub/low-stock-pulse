@@ -44,14 +44,20 @@ class ProductController extends Controller
                     $key = $product['id'] . '_' . $variant['id'];
                     $threshold = $existingThresholds->get($key);
                     
+                    $shopifyInventory = $variant['inventory_quantity'];
+                    $thresholdQty = $threshold ? $threshold->threshold_quantity : 0;
+
+                    // Use live Shopify inventory for comparison, not DB inventory
+                    $isBelowThreshold = $threshold && $shopifyInventory < $thresholdQty;
+
                     return [
                         'id' => $variant['id'],
                         'title' => $variant['title'],
                         'sku' => $variant['sku'],
-                        'inventory_quantity' => $variant['inventory_quantity'],
-                        'threshold_quantity' => $threshold ? $threshold->threshold_quantity : 0,
+                        'inventory_quantity' => $shopifyInventory,
+                        'threshold_quantity' => $thresholdQty,
                         'alerts_enabled' => $threshold ? $threshold->alerts_enabled : true,
-                        'is_below_threshold' => $threshold ? $threshold->isBelowThreshold() : false,
+                        'is_below_threshold' => $isBelowThreshold,
                         'last_checked_at' => $threshold ? $threshold->last_checked_at : null,
                         'last_alert_sent_at' => $threshold ? $threshold->last_alert_sent_at : null,
                     ];
@@ -113,12 +119,20 @@ class ProductController extends Controller
             $shopDomain = $session->getShop();
             
             $shopifyService = new ShopifyProductService($session);
-            
-            // Get current inventory level
+
+            // Get current inventory level from Shopify
             $currentInventory = $shopifyService->getInventoryLevel(
                 $request->product_id,
                 $request->variant_id
             );
+
+            // Log if inventory fetch failed
+            if ($currentInventory === null) {
+                Log::warning("Failed to fetch current inventory for product {$request->product_id}, variant {$request->variant_id}. Using 0 as fallback.");
+                $currentInventory = 0;
+            } else {
+                Log::info("Successfully fetched current inventory: {$currentInventory} for product {$request->product_id}, variant {$request->variant_id}");
+            }
 
             $productThreshold = ProductThreshold::updateOrCreate(
                 [
@@ -130,7 +144,7 @@ class ProductController extends Controller
                     'product_title' => $request->product_title,
                     'variant_title' => $request->variant_title,
                     'threshold_quantity' => $request->threshold_quantity,
-                    'current_inventory' => $currentInventory ?? 0,
+                    'current_inventory' => $currentInventory,
                     'last_checked_at' => now(),
                 ]
             );
@@ -236,12 +250,17 @@ class ProductController extends Controller
 
     /**
      * Get products that are below their thresholds.
+     * Updates inventory from Shopify first to ensure accurate data.
      */
     public function getBelowThreshold(Request $request): JsonResponse
     {
         try {
             $session = $request->get('shopifySession');
             $shopDomain = $session->getShop();
+
+            // First, update inventory levels from Shopify to ensure accuracy
+            $shopifyService = new ShopifyProductService($session);
+            $shopifyService->updateInventoryLevels($shopDomain);
 
             $belowThresholdProducts = ProductThreshold::forShop($shopDomain)
                 ->withAlertsEnabled()
@@ -254,7 +273,7 @@ class ProductController extends Controller
                 'data' => $belowThresholdProducts,
                 'count' => $belowThresholdProducts->count(),
             ]);
-            
+
         } catch (\Exception $e) {
             Log::error('Failed to get below threshold products: ' . $e->getMessage());
             return response()->json([

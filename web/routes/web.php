@@ -120,6 +120,7 @@ Route::middleware('shopify.auth')->prefix('api/low-stock-pulse')->group(function
     Route::get('/settings/activity-logs', [App\Http\Controllers\SettingsController::class, 'getActivityLogs']);
     Route::get('/settings/recent-logs', [App\Http\Controllers\SettingsController::class, 'getRecentActivityLogs']);
     Route::post('/settings/test-email', [App\Http\Controllers\SettingsController::class, 'testEmail']);
+    Route::get('/settings/email-service-info', [App\Http\Controllers\SettingsController::class, 'getEmailServiceInfo']);
     Route::get('/dashboard/stats', [App\Http\Controllers\SettingsController::class, 'getDashboardStats']);
 });
 
@@ -170,3 +171,8 @@ Route::post('/api/webhooks', function (Request $request) {
         return response()->json(['message' => "Got an exception when handling '$topic' webhook"], 500);
     }
 });
+
+// Low Stock Pulse specific webhooks
+Route::post('/api/webhooks/inventory/update', [App\Http\Controllers\WebhookController::class, 'handleInventoryLevelUpdate']);
+Route::post('/api/webhooks/orders/create', [App\Http\Controllers\WebhookController::class, 'handleOrderCreate']);
+Route::post('/api/webhooks/products/update', [App\Http\Controllers\WebhookController::class, 'handleProductUpdate']);

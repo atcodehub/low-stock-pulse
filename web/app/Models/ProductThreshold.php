@@ -45,7 +45,7 @@ class ProductThreshold extends Model
      */
     public function isBelowThreshold(): bool
     {
-        return $this->current_inventory <= $this->threshold_quantity;
+        return $this->current_inventory < $this->threshold_quantity;
     }
 
     /**
@@ -89,6 +89,6 @@ class ProductThreshold extends Model
      */
     public function scopeBelowThreshold($query)
     {
-        return $query->whereRaw('current_inventory <= threshold_quantity');
+        return $query->whereRaw('current_inventory < threshold_quantity');
     }
 }

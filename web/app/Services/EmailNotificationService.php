@@ -5,10 +5,14 @@ namespace App\Services;
 use App\Models\ProductThreshold;
 use App\Models\AlertSetting;
 use App\Models\ActivityLog;
+use App\Models\Session;
+use App\Mail\TestEmail;
+use App\Services\ShopifyEmailService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Mail\Mailable;
+use Shopify\Auth\Session as ShopifySession;
 
 class EmailNotificationService
 {
@@ -191,14 +195,14 @@ class EmailNotificationService
     public function sendTestEmail(string $emailAddress, string $shopDomain): bool
     {
         try {
-            $emailData = [
-                'shop_domain' => $shopDomain,
-                'test_message' => 'This is a test email from Low Stock Pulse app.',
-                'sent_at' => now()->format('Y-m-d H:i:s'),
-            ];
+            $testMessage = 'This is a test email from Low Stock Pulse app to verify your email configuration is working correctly.';
+            $sentAt = now()->format('Y-m-d H:i:s');
 
-            return $this->sendEmail($emailAddress, 'Low Stock Pulse - Test Email', $emailData);
-            
+            Mail::to($emailAddress)->send(new TestEmail($shopDomain, $testMessage, $sentAt));
+
+            Log::info("Test email sent successfully to {$emailAddress} for shop {$shopDomain}");
+            return true;
+
         } catch (\Exception $e) {
             Log::error('Failed to send test email: ' . $e->getMessage());
             return false;
@@ -225,20 +229,49 @@ class EmailNotificationService
     }
 
     /**
-     * Send single product email.
+     * Send single product email using ShopifyEmailService.
      */
     private function sendEmail(string $emailAddress, string $subject, array $data): bool
     {
         try {
-            // TODO: Replace with Shopify Transactional Email implementation
-            // For now, we'll simulate email sending
             Log::info("Sending email to {$emailAddress} with subject: {$subject}", $data);
-            
-            // Simulate email sending delay
-            usleep(100000); // 0.1 second delay
-            
-            return true;
-            
+
+            // Get shop session
+            $shopDomain = $data['shop_domain'];
+            $session = Session::where('shop', $shopDomain)->first();
+
+            if (!$session) {
+                Log::error("No session found for shop {$shopDomain}");
+                return false;
+            }
+
+            // Create Shopify session
+            $shopifySession = new ShopifySession(
+                id: $session->id,
+                shop: $session->shop,
+                isOnline: false,
+                state: ''
+            );
+            $shopifySession->setAccessToken($session->access_token);
+
+            // Prepare products array for the email
+            $products = [];
+            if (isset($data['product']) && $data['product'] instanceof ProductThreshold) {
+                $products[] = [
+                    'title' => $data['product']->product_title,
+                    'variant_title' => $data['product']->variant_title,
+                    'current_inventory' => $data['product']->current_inventory,
+                    'threshold_quantity' => $data['product']->threshold_quantity,
+                    'sku' => $data['product']->sku ?? '',
+                ];
+            }
+
+            // Use ShopifyEmailService to send the alert
+            $shopifyEmailService = new ShopifyEmailService();
+            $result = $shopifyEmailService->sendLowStockAlert($shopifySession, $products, $emailAddress);
+
+            return $result['success'] ?? false;
+
         } catch (\Exception $e) {
             Log::error('Failed to send email: ' . $e->getMessage());
             return false;
@@ -246,23 +279,56 @@ class EmailNotificationService
     }
 
     /**
-     * Send batch email with multiple products.
+     * Send batch email with multiple products using ShopifyEmailService.
      */
     private function sendBatchEmail(string $emailAddress, string $subject, array $data): bool
     {
         try {
-            // TODO: Replace with Shopify Transactional Email implementation
-            // For now, we'll simulate email sending
             Log::info("Sending batch email to {$emailAddress} with subject: {$subject}", [
                 'product_count' => $data['total_count'],
                 'alert_type' => $data['alert_type'],
             ]);
-            
-            // Simulate email sending delay
-            usleep(200000); // 0.2 second delay
-            
-            return true;
-            
+
+            // Get shop session
+            $shopDomain = $data['shop_domain'];
+            $session = Session::where('shop', $shopDomain)->first();
+
+            if (!$session) {
+                Log::error("No session found for shop {$shopDomain}");
+                return false;
+            }
+
+            // Create Shopify session
+            $shopifySession = new ShopifySession(
+                id: $session->id,
+                shop: $session->shop,
+                isOnline: false,
+                state: ''
+            );
+            $shopifySession->setAccessToken($session->access_token);
+
+            // Prepare products array for the email
+            $products = [];
+            if (isset($data['products']) && is_array($data['products'])) {
+                foreach ($data['products'] as $product) {
+                    if ($product instanceof ProductThreshold) {
+                        $products[] = [
+                            'title' => $product->product_title,
+                            'variant_title' => $product->variant_title,
+                            'current_inventory' => $product->current_inventory,
+                            'threshold_quantity' => $product->threshold_quantity,
+                            'sku' => $product->sku ?? '',
+                        ];
+                    }
+                }
+            }
+
+            // Use ShopifyEmailService to send the batch alert
+            $shopifyEmailService = new ShopifyEmailService();
+            $result = $shopifyEmailService->sendLowStockAlert($shopifySession, $products, $emailAddress);
+
+            return $result['success'] ?? false;
+
         } catch (\Exception $e) {
             Log::error('Failed to send batch email: ' . $e->getMessage());
             return false;

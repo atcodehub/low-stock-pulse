@@ -55,11 +55,11 @@ export default function Products() {
     } finally {
       setLoading(false);
     }
-  }, [fetch]);
+  }, []); // Remove fetch dependency to prevent infinite loop
 
   useEffect(() => {
     fetchProducts();
-  }, [fetchProducts]);
+  }, []); // Empty dependency array - only run once on mount
 
   const handleThresholdUpdate = async (productId, variantId, newThreshold, productTitle, variantTitle) => {
     setUpdating(true);
@@ -105,7 +105,7 @@ export default function Products() {
       });
 
       const data = await response.json();
-      
+
       if (data.success) {
         setToast({ content: `Alerts ${enabled ? 'enabled' : 'disabled'} successfully` });
         fetchProducts(); // Refresh the data
@@ -117,13 +117,7 @@ export default function Products() {
     }
   };
 
-  const openThresholdModal = (product, variant) => {
-    setSelectedProduct({ product, variant });
-    setThresholdValue(variant.threshold_quantity.toString());
-    setModalActive(true);
-  };
-
-  const handleUpdateInventory = async () => {
+  const refreshInventory = async () => {
     setUpdating(true);
     try {
       const response = await fetch('/api/low-stock-pulse/products/update-inventory', {
@@ -131,10 +125,10 @@ export default function Products() {
       });
 
       const data = await response.json();
-      
+
       if (data.success) {
-        setToast({ content: data.message });
-        fetchProducts(); // Refresh the data
+        setToast({ content: `Inventory updated for ${data.updated_count} products` });
+        fetchProducts(); // Refresh the data to show updated inventory
       } else {
         setToast({ content: data.message || 'Failed to update inventory', error: true });
       }
@@ -144,6 +138,14 @@ export default function Products() {
       setUpdating(false);
     }
   };
+
+  const openThresholdModal = (product, variant) => {
+    setSelectedProduct({ product, variant });
+    setThresholdValue(variant.threshold_quantity.toString());
+    setModalActive(true);
+  };
+
+
 
   // Prepare data for DataTable
   const tableRows = [];
@@ -238,8 +240,8 @@ export default function Products() {
       <Page
         title="Product Inventory Management"
         primaryAction={{
-          content: 'Update All Inventory',
-          onAction: handleUpdateInventory,
+          content: 'Refresh Inventory from Shopify',
+          onAction: refreshInventory,
           loading: updating,
         }}
       >
@@ -257,7 +259,7 @@ export default function Products() {
                   <DataTable
                     columnContentTypes={[
                       'text',
-                      'text', 
+                      'text',
                       'text',
                       'numeric',
                       'numeric',

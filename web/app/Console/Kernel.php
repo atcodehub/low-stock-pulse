@@ -14,6 +14,9 @@ class Kernel extends ConsoleKernel
      */
     protected $commands = [
         Commands\ProcessLowStockAlerts::class,
+        Commands\RegisterWebhooks::class,
+        Commands\CheckForNewOrders::class,
+        Commands\SyncInventoryAndCheckAlerts::class,
     ];
 
     /**
@@ -24,9 +27,9 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule)
     {
-        // Process low stock alerts every 15 minutes
-        $schedule->command('low-stock:process-alerts')
-                 ->everyFifteenMinutes()
+        // Sync inventory and check alerts every 2 minutes (replaces order webhooks)
+        $schedule->command('inventory:sync-and-alert --all')
+                 ->everyTwoMinutes()
                  ->withoutOverlapping()
                  ->runInBackground();
     }

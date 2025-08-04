@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\AlertSetting;
 use App\Models\ActivityLog;
 use App\Models\ProductThreshold;
+use App\Services\EmailNotificationService;
+use App\Services\ShopifyEmailService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
@@ -197,16 +199,30 @@ class SettingsController extends Controller
 
         try {
             $session = $request->get('shopifySession');
-            $shopDomain = $session->getShop();
 
-            // TODO: Implement email service test
-            // For now, we'll just return a success response
-            
-            return response()->json([
-                'success' => true,
-                'message' => 'Test email sent successfully',
-            ]);
-            
+            if (!$session) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No Shopify session found',
+                ], 401);
+            }
+
+            $shopifyEmailService = new ShopifyEmailService();
+            $result = $shopifyEmailService->sendTestEmail($session, $request->test_email);
+
+            if ($result['success']) {
+                return response()->json([
+                    'success' => true,
+                    'message' => $result['message'],
+                    'shop_info' => $result['shop_info'] ?? null,
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => $result['message'],
+                ], 500);
+            }
+
         } catch (\Exception $e) {
             Log::error('Failed to send test email: ' . $e->getMessage());
             return response()->json([
@@ -276,6 +292,46 @@ class SettingsController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to fetch dashboard stats',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Get email service recommendations for the shop.
+     */
+    public function getEmailServiceInfo(Request $request): JsonResponse
+    {
+        try {
+            $session = $request->get('shopifySession');
+
+            if (!$session) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No Shopify session found',
+                ], 401);
+            }
+
+            $shopifyEmailService = new ShopifyEmailService();
+            $shopInfo = $shopifyEmailService->getShopInfo($session);
+            $canSendEmails = $shopifyEmailService->canSendEmails($session);
+            $recommendedService = $shopifyEmailService->getRecommendedEmailService($session);
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'shop_info' => $shopInfo,
+                    'can_send_emails' => $canSendEmails,
+                    'recommended_service' => $recommendedService,
+                    'current_setup' => 'Shopify-Integrated Email Service',
+                ],
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Failed to get email service info: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to get email service info',
                 'error' => $e->getMessage(),
             ], 500);
         }
